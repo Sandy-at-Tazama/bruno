@@ -1,0 +1,21 @@
+meta {
+  name: deactivate-routing-configs
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{DATABASE_URL}}/_db/{{CONFIGURATION_DATABASE}}/_api/cursor
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "query": "FOR doc IN {{COLLECTION_ROUTING_CONFIGURATION}} UPDATE doc WITH { active: false } IN {{COLLECTION_ROUTING_CONFIGURATION}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}

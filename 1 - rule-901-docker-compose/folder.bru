@@ -1,0 +1,29 @@
+meta {
+  name: end-to-end
+}
+
+script:pre-request {
+  // Assign auth token variable if auth is enabled
+  if (bru.getEnvVar('AUTH_ENABLED') === 'true') {
+    const axios = require('axios');
+  
+    const body = {
+      username: bru.getEnvVar('AUTH_USERNAME'),
+      password: bru.getEnvVar('AUTH_PASSWORD')
+    };
+    
+    try {
+      const url = bru.getEnvVar('AUTH_URL')
+      const version = bru.getEnvVar('AUTH_VERSION')
+      const path = bru.getEnvVar('AUTH_PATH')
+  
+      const endpoint = `${url}/${version}/${path}`;
+      const { data } = await axios.post(endpoint, body);
+      
+      bru.setEnvVar('AUTH_TOKEN', data)
+    } catch (err) {
+      console.error(err)
+    }
+    
+  }
+}

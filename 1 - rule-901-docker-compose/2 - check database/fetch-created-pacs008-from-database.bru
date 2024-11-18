@@ -1,0 +1,17 @@
+meta {
+  name: fetch-created-pacs008-from-database
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{DATABASE_URL}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+      "query": "FOR doc in {{COLLECTION_TRANSACTION_HISTORY_PACS008}} FILTER doc.FIToFICstmrCdtTrf.GrpHdr.MsgId == '{{messageIdPacs008}}' RETURN doc"
+  }
+}

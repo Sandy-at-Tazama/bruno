@@ -1,0 +1,47 @@
+meta {
+  name: insert-routing-config
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{DATABASE_URL}}/_db/{{CONFIGURATION_DATABASE}}/_api/document/{{COLLECTION_ROUTING_CONFIGURATION}}
+  body: json
+  auth: none
+}
+
+body:json {
+  [
+    {
+      "active": true,
+      "cfg": "1.0.0",
+      "messages": [
+        {
+          "id": "004@1.0.0",
+          "cfg": "1.0.0",
+          "txTp": "pacs.002.001.12",
+          "typologies": [
+            {
+              "id": "typology-processor@1.0.0",
+              "cfg": "999@1.0.0",
+              "rules": [
+                {
+                  "id": "901@1.0.0",
+                  "cfg": "1.0.0"
+                },
+                {
+                  "id": "EFRuP@1.0.0",
+                  "cfg": "none"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+assert {
+  res.status: eq 202
+}

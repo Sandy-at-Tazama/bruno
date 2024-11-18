@@ -1,0 +1,189 @@
+meta {
+  name: 2 - single-transaction-now-unsuccessful
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:3001/natsPublish
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:pre-request {
+  const { generateFullMessageSet, prepGraphEntities, prepGraphAccountHolders, prepGraphTransactions, prepGraphAccounts } = require('tazama-test-utils');
+  
+  const axios = require('axios');
+  
+  const quoting = bru.getEnvVar('QUOTING') === 'true';
+  
+  const {  pacs002, pain001, pain013, pacs008, dataCache } = generateFullMessageSet(quoting, {
+    amount: 1000,
+    status: 'ACSC'
+  });
+  
+  let debtorId = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.Dbtr.Id.PrvtId.Othr[0].Id;
+  let creditorId = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.Dbtr.Id.PrvtId.Othr[0].Id;
+  let debtorAccountId = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.DbtrAcct.Id.Othr[0].Id
+  let creditorAccountId = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.CdtrAcct.Id.Othr[0].Id
+  let creDtTm;
+  
+  let currency = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.InstdAmt.Amt.Ccy;
+  let amount = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.InstdAmt.Amt.Amt;
+  let endToEndId = pacs008.FIToFICstmrCdtTrf.CdtTrfTxInf.PmtId.EndToEndId;
+  let timestampPacs008 = pacs008.FIToFICstmrCdtTrf.GrpHdr.CreDtTm;
+  let messageIdPacs008 = pacs008.FIToFICstmrCdtTrf.GrpHdr.MsgId;
+  
+  let timestampPacs002 = pacs002.FIToFIPmtSts.GrpHdr.CreDtTm;
+  let messageIdPacs002 = pacs002.FIToFIPmtSts.GrpHdr.MsgId;
+  let pacs002Sts = pacs002.FIToFIPmtSts.TxInfAndSts.TxSts;
+  
+  let quotingData;
+  
+  if (quoting) {
+    creDtTm = pain001.CstmrCdtTrfInitn.GrpHdr.CreDtTm;
+    const timestampPain001 = pain001.CstmrCdtTrfInitn.GrpHdr.CreDtTm;
+    const messageIdPain001 = pain001.CstmrCdtTrfInitn.GrpHdr.MsgId;
+    const timestampPain013 = pain013.CdtrPmtActvtnReq.GrpHdr.CreDtTm;
+    const messageIdPain013 = pain013.CdtrPmtActvtnReq.GrpHdr.MsgId;
+    quotingData = {
+      timestampPain001, messageIdPain001, timestampPain013, messageIdPain013  
+    }
+  } else {
+    creDtTm = pacs008.FIToFICstmrCdtTrf.GrpHdr.CreDtTm;
+  }
+  
+  let transactions = prepGraphTransactions(debtorAccountId, creditorAccountId, currency, amount, endToEndId, timestampPacs008, messageIdPacs008, timestampPacs002, messageIdPacs002, pacs002Sts, quotingData)
+  const graphEntities = prepGraphEntities(debtorId, creditorId, creDtTm);
+  
+  const accountHolders = prepGraphAccountHolders(debtorId, debtorAccountId, creditorId, creditorAccountId, creDtTm);
+  
+  const accounts = prepGraphAccounts(debtorAccountId, creditorAccountId)
+  
+  const createArangoEndpoint = (database, collection) => {
+    const url = bru.getEnvVar("DATABASE_URL");
+    const endpoint = `${url}/_db/${database}/_api/document/${collection}`;
+    console.log('sending request to', endpoint);
+    return endpoint
+  }
+  
+  const transactionHistoryDB = bru.getEnvVar("TRANSACTION_HISTORY_DATABASE");
+  const pseudonymsDB = bru.getEnvVar("PSEUDONYMS_DATABASE");
+  
+  const pain001Collection = bru.getEnvVar("COLLECTION_TRANSACTION_HISTORY_PAIN001");
+  const pain013Collection = bru.getEnvVar("COLLECTION_TRANSACTION_HISTORY_PAIN013");
+  const pacs002Collection = bru.getEnvVar("COLLECTION_TRANSACTION_HISTORY_PACS002");
+  const pacs008Collection = bru.getEnvVar("COLLECTION_TRANSACTION_HISTORY_PACS008");
+  
+  const accountsGraph = bru.getEnvVar("COLLECTION_GRAPH_ACCOUNTS");
+  const entitiesGraph = bru.getEnvVar("COLLECTION_GRAPH_ENTITIES");
+  const transactionRelationshipGraph = bru.getEnvVar("COLLECTION_GRAPH_TRANSACTION");
+  const accountHoldersGraph = bru.getEnvVar("COLLECTION_GRAPH_ACCOUNT_HOLDERS");
+  
+  console.log('sending request');
+  if (quoting) {
+    await axios.post(createArangoEndpoint(transactionHistoryDB, pain001Collection), { ...pain001, DataCache: dataCache });
+    await axios.post(createArangoEndpoint(transactionHistoryDB, pain013Collection), {...pain013, DataCache: dataCache });
+  }
+  
+  await axios.post(createArangoEndpoint(transactionHistoryDB, pacs008Collection), {...pacs008, DataCache: dataCache});
+  await axios.post(createArangoEndpoint(transactionHistoryDB, pacs002Collection), {...pacs002, DataCache: dataCache});
+  await axios.post(createArangoEndpoint(pseudonymsDB, accountsGraph), accounts);
+  await axios.post(createArangoEndpoint(pseudonymsDB, entitiesGraph), graphEntities);
+  await axios.post(createArangoEndpoint(pseudonymsDB, transactionRelationshipGraph), transactions);
+  await axios.post(createArangoEndpoint(pseudonymsDB, accountHoldersGraph), accountHolders);
+  
+  
+  const getRuleBody = (ruleId, ruleCfgVer, messageBody, dataCache) => {
+    ruleId = ruleId ? ruleId : '901@1.0.0';
+    ruleCfgVer = ruleCfgVer ? ruleCfgVer : '1.0.0';
+    const natsPub = `pub-rule-${ruleId}`;
+    const natsSub = `sub-rule-${ruleId}`;
+    const msgId = messageBody.FIToFIPmtSts.GrpHdr.MsgId;
+    return {
+        "awaitReply": true,
+        "destination": `${natsSub}`,
+        "consumer": `${natsPub}`,
+        "functionName": `${msgId}`,
+        "message": {
+            "transaction": messageBody,
+            "DataCache": dataCache,
+            "networkMap": {
+                "name": "Step-by-step processor testing - rule output to NATS REST proxy",
+                "active": true,
+                "cfg": "1.0.0",
+                "messages": [
+                    {
+                        "id": "004@1.0.0",
+                        "cfg": "1.0.0",
+                        "txTp": "pacs.002.001.12",
+                        "typologies": [
+                            {
+                                "id": "typology_999@1.0.0",
+                                "cfg": "1.0.0",
+                                "rules": [
+                                    {
+                                        "id": `${ruleId}`,
+                                        "cfg": `${ruleCfgVer}`
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "metaData": {
+                "prcgTmDP": 0,
+                "traceParent": `00-postman-${msgId}-01`,
+                "prcgTmCRSP": 0
+            }
+        }
+    };
+  }
+  
+  const ruleBody = getRuleBody('901@1.0.0', '1.0.0', pacs002, dataCache);
+  
+  req.setBody(ruleBody)
+  
+  
+}
+
+tests {
+  const targetRuleResult = {
+      "id": "901@1.0.0",
+      "cfg": "1.0.0",
+      "subRuleRef": ".x00",
+      "reason": "The debtor has performed one transaction to date",
+      "desc": "Number of outgoing transactions - debtor"
+  };
+  
+  let response = res.getBody().data.ruleResult;
+  
+  test("should return the same id", function() {
+    expect(response.id).to.be.eql(targetRuleResult.id);
+  });
+  
+  test("should return the same cfg", function() {
+    expect(response.cfg).to.be.eql(targetRuleResult.cfg);
+  });
+  
+  test("should return the same subRuleRef", function() {
+    expect(response.subRuleRef).to.be.eql(targetRuleResult.subRuleRef);
+  });
+  
+  test("should that result does not exist", function() {
+    expect(response).to.not.have.property('result')
+  });
+  
+  test("should that desc does not exist", function() {
+    expect(response).to.not.have.property('desc')
+  });
+  
+  test("should that reason does not exist", function() {
+    expect(response).to.not.have.property('reason')
+  });
+}

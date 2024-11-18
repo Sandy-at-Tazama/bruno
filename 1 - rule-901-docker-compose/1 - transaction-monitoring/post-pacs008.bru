@@ -1,0 +1,23 @@
+meta {
+  name: post-pacs008
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{TMS_URL}}/{{TMS_VERSION}}/{{TMS_PATH_PACS008}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{AUTH_TOKEN}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:pre-request {
+  req.setBody(bru.getEnvVar('CURRENT_PACS008'))
+}

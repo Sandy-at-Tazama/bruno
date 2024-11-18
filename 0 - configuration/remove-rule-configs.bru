@@ -1,0 +1,21 @@
+meta {
+  name: remove-rule-configs
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{DATABASE_URL}}/_db/{{CONFIGURATION_DATABASE}}/_api/cursor
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "query": "FOR doc in {{COLLECTION_RULE_CONFIGURATION}} REMOVE doc in {{COLLECTION_RULE_CONFIGURATION}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}

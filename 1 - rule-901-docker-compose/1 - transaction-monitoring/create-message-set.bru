@@ -1,0 +1,71 @@
+meta {
+  name: create-message-set
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{TMS_URL}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.body.status: eq UP
+}
+
+script:pre-request {
+  const { generateFullMessageSet } = require('tazama-test-utils')
+  
+  const quoting = bru.getEnvVar('QUOTING') === 'true';
+  
+  const {  pacs002, pain001, pain013, pacs008 } = generateFullMessageSet(quoting);
+  
+  // tms schema also needs this
+  pacs008.FIToFICstmrCdtTrf.SplmtryData.Envlp.Doc.InitgPty = {
+    "Glctn": {
+      "Lat": "10.0",
+      "Long": "10.0"
+    }
+  }
+  
+  if (quoting) {
+    // tms schema needs this field
+    pain013.CdtrPmtActvtnReq.PmtInf.DbtrAcct.Nm = pain001.CstmrCdtTrfInitn.PmtInf.DbtrAcct.Nm;
+    bru.setEnvVar('CURRENT_PAIN001', pain001);
+    bru.setEnvVar('CURRENT_PAIN013', pain013);
+  }
+  
+  bru.setEnvVar('CURRENT_PACS008', pacs008);
+  bru.setEnvVar('CURRENT_PACS002', pacs002);
+  
+}
+
+script:post-response {
+  console.log('pacs008', bru.getEnvName('CURRENT_PACS008'))
+  console.log('pacs002', bru.getEnvName('CURRENT_PACS002'))
+}
+
+tests {
+  const pacs008 = bru.getEnvVar('CURRENT_PACS008');
+  const pacs002 = bru.getEnvVar('CURRENT_PACS002');
+  const pain001 = bru.getEnvVar('CURRENT_PAIN001');
+  const pain013 = bru.getEnvVar('CURRENT_PAIN013');
+  const quotingEnabled = bru.getEnvVar('QUOTING') === 'true';
+  
+  
+  test("should check if Pacs008 and Pacs002 are set", function() {
+    expect(pacs002).to.exist;
+    expect(pacs008).to.exist;
+  });
+  
+  test("should check if Pain001 and Pain013 are set if quoting is enabled", function() {
+    if (quotingEnabled) {
+      expect(pain001).to.exist;
+      expect(pain013).to.exist;
+    } else {
+      expect(pain001).to.not.exist;
+      expect(pain013).to.not.exist;
+    }
+  });
+}

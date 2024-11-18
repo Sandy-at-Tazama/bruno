@@ -1,2 +1,2 @@
-# bruno
-This is the repository for bruno tests
+# notes
+Quoting and auth_enabled should correspond to the TMS config

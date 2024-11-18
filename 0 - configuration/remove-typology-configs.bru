@@ -1,0 +1,21 @@
+meta {
+  name: remove-typology-configs
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{DATABASE_URL}}/_db/{{CONFIGURATION_DATABASE}}/_api/cursor
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "query": "FOR doc in {{COLLECTION_TYPOLOGY_CONFIGURATION}} REMOVE doc in {{COLLECTION_TYPOLOGY_CONFIGURATION}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}

@@ -1,0 +1,36 @@
+meta {
+  name: post-pain001
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{TMS_URL}}/{{TMS_VERSION}}/{{TMS_PATH_PAIN001}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{AUTH_TOKEN}}
+}
+
+script:pre-request {
+  if (bru.getEnvVar('QUOTING') === 'true') {
+    req.setBody(bru.getEnvVar('CURRENT_PAIN001'))
+  }
+  
+}
+
+tests {
+  test("should be ok if quoting is enabled and 404 otherwise", function() {
+    const quotingDisabled = bru.getEnvVar('QUOTING') !== 'true';
+  
+    let expectedStatus = 200;
+    
+    if (quotingDisabled) {
+      expectedStatus = 404;
+    }
+    expect(res.getStatus()).to.equal(expectedStatus);
+    
+  });
+}
