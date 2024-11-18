@@ -1,7 +1,7 @@
 meta {
-  name: 2 - single-transaction-now-unsuccessful
+  name: 6 - four-incoming-bad-history-ok
   type: http
-  seq: 2
+  seq: 6
 }
 
 post {
@@ -80,7 +80,7 @@ script:pre-request {
       creDtTm = pacs8.FIToFICstmrCdtTrf.GrpHdr.CreDtTm;
     }
   
-    let transactions = prepGraphTransactions(debtorAccountId, creditorAccountId, currency, amount, endToEndId, timestampPacs008, messageIdPacs008, timestampPacs002, messageIdPacs002, pacs002Sts, quotingData)
+    let transactions = prepGraphTransactions(dataCache.dbtrAcctId, dataCache.cdtrAcctId, currency, amount, endToEndId, timestampPacs008, messageIdPacs008, timestampPacs002, messageIdPacs002, pacs002Sts, quotingData)
     const graphEntities = prepGraphEntities(debtorId, creditorId, creDtTm);
   
     const accountHolders = prepGraphAccountHolders(debtorId, debtorAccountId, creditorId, creditorAccountId, creDtTm);
@@ -153,6 +153,17 @@ script:pre-request {
   
   const ruleBody = getRuleBody('901@1.0.0', '1.0.0', pacs002, dataCache);
   
+  const results = generateFullMessageSet(quoting, {
+    firstSetTime: 3600000 * 4,
+    status: 'ACCC'
+  }, {creditor, debtor, count: 3});
+  
+  const promises = results.map((result)=> {
+   return postData(result.pacs008, result.pacs002, result.dataCache, result.pain001, result.pain013);
+  })
+  
+  await Promise.all(promises)
+  
   req.setBody(ruleBody)
   
   
@@ -163,7 +174,7 @@ tests {
       "id": "901@1.0.0",
       "cfg": "1.0.0",
       "subRuleRef": ".x00",
-      "reason": "The debtor has performed one transaction to date",
+      "reason": "Incoming transaction is unsuccessful",
       "desc": "Number of outgoing transactions - debtor"
   };
   

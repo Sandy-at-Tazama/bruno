@@ -19,7 +19,7 @@ script:pre-request {
   
   const quoting = bru.getEnvVar('QUOTING') === 'true';
   
-  const {  pacs002, pain001, pain013, pacs008 } = generateFullMessageSet(quoting);
+  const {  pacs002, pain001, pain013, pacs008 } = generateFullMessageSet(quoting)[0];
   
   // tms schema also needs this
   pacs008.FIToFICstmrCdtTrf.SplmtryData.Envlp.Doc.InitgPty = {
