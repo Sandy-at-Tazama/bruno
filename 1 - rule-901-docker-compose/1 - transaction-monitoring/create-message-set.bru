@@ -21,17 +21,10 @@ script:pre-request {
   
   const {  pacs002, pain001, pain013, pacs008 } = generateFullMessageSet(quoting)[0];
   
-  // tms schema also needs this
-  pacs008.FIToFICstmrCdtTrf.SplmtryData.Envlp.Doc.InitgPty = {
-    "Glctn": {
-      "Lat": "10.0",
-      "Long": "10.0"
-    }
-  }
+  console.log('pacs008', pacs008)
   
   if (quoting) {
     // tms schema needs this field
-    pain013.CdtrPmtActvtnReq.PmtInf.DbtrAcct.Nm = pain001.CstmrCdtTrfInitn.PmtInf.DbtrAcct.Nm;
     bru.setEnvVar('CURRENT_PAIN001', pain001);
     bru.setEnvVar('CURRENT_PAIN013', pain013);
   }
